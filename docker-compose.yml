@@ -1,0 +1,39 @@
+version: "3.9"
+
+services:
+  suricata:
+    image: jasonish/suricata:latest
+    container_name: suricata-ids
+    network_mode: host           # Needed for raw packet capture
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+      - SYS_NICE
+    volumes:
+      - ./config/suricata.yaml:/etc/suricata/suricata.yaml:ro
+      - ./rules/local.rules:/etc/suricata/rules/local.rules:ro
+      - suricata-logs:/var/log/suricata
+      - suricata-rules:/var/lib/suricata/rules
+    environment:
+      - SURICATA_OPTIONS=-i eth0 --set sensor-name=docker-ids
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "suricatasc", "-c", "version"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Log watcher — streams alerts to stdout
+  log-viewer:
+    image: alpine:latest
+    container_name: ids-log-viewer
+    volumes:
+      - suricata-logs:/var/log/suricata:ro
+    command: ["tail", "-f", "/var/log/suricata/fast.log"]
+    depends_on:
+      - suricata
+    restart: unless-stopped
+
+volumes:
+  suricata-logs:
+  suricata-rules:

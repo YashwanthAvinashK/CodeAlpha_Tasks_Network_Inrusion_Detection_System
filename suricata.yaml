@@ -1,0 +1,210 @@
+%YAML 1.1
+---
+# =============================================================
+# Suricata IDS Configuration — suricata.yaml
+# Project: Network Intrusion Detection System
+# =============================================================
+
+vars:
+  address-groups:
+    HOME_NET: "[192.168.0.0/16,10.0.0.0/8,172.16.0.0/12]"
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+    SMTP_SERVERS: "$HOME_NET"
+    SQL_SERVERS: "$HOME_NET"
+    DNS_SERVERS: "$HOME_NET"
+    TELNET_SERVERS: "$HOME_NET"
+    AIM_SERVERS: "$EXTERNAL_NET"
+    DC_SERVERS: "$HOME_NET"
+    DNP3_SERVER: "$HOME_NET"
+    DNP3_CLIENT: "$HOME_NET"
+    MODBUS_CLIENT: "$HOME_NET"
+    MODBUS_SERVER: "$HOME_NET"
+    ENIP_CLIENT: "$HOME_NET"
+    ENIP_SERVER: "$HOME_NET"
+
+  port-groups:
+    HTTP_PORTS: "80"
+    SHELLCODE_PORTS: "!80"
+    ORACLE_PORTS: 1521
+    SSH_PORTS: 22
+    DNP3_PORTS: 20000
+    MODBUS_PORTS: 502
+    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
+    FTP_PORTS: 21
+    VXLAN_PORTS: 4789
+    TEREDO_PORTS: 3544
+
+# =============================================================
+# Network Interface Configuration
+# =============================================================
+af-packet:
+  - interface: eth0
+    threads: auto
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    ring-size: 2048
+    block-size: 32768
+    block-timeout: 10
+    use-emergency-flush: yes
+
+# =============================================================
+# Outputs — EVE JSON (compatible with ELK / Grafana)
+# =============================================================
+outputs:
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: /var/log/suricata/eve.json
+      pcap-file: false
+      community-id: true
+      community-id-seed: 0
+      types:
+        - alert:
+            payload: yes
+            payload-buffer-size: 4kb
+            payload-printable: yes
+            packet: yes
+            metadata: yes
+            http-body: yes
+            http-body-printable: yes
+            tagged-packets: yes
+        - anomaly:
+            enabled: yes
+            types:
+              decode: no
+              stream: no
+              applayer: yes
+        - http:
+            extended: yes
+            dump-all-headers: both
+        - dns:
+            version: 2
+            requests: yes
+            responses: yes
+        - tls:
+            extended: yes
+            session-resumption: no
+        - files:
+            force-magic: no
+        - smtp: {}
+        - ftp: {}
+        - rdp: {}
+        - nfs: {}
+        - smb: {}
+        - tftp: {}
+        - ikev2: {}
+        - dcerpc: {}
+        - krb5: {}
+        - bittorrent-dht: {}
+        - ssh: {}
+        - flow: {}
+        - netflow: {}
+        - stats:
+            totals: yes
+            threads: no
+            deltas: no
+
+  - fast:
+      enabled: yes
+      filename: /var/log/suricata/fast.log
+      append: yes
+
+  - stats:
+      enabled: yes
+      filename: /var/log/suricata/stats.log
+      append: yes
+      totals: yes
+      threads: no
+
+# =============================================================
+# Detection Engine
+# =============================================================
+detect:
+  profile: high
+  custom-values:
+    toclient-groups: 3
+    toserver-groups: 25
+  sgh-mpm-context: auto
+  inspection-recursion-limit: 3000
+  prefilter:
+    default: mpm
+
+# =============================================================
+# Application Layer Protocol Detection
+# =============================================================
+app-layer:
+  protocols:
+    tls:
+      enabled: yes
+      detection-ports:
+        dp: 443
+    http:
+      enabled: yes
+      libhtp:
+        default-config:
+          personality: IDS
+          request-body-limit: 100kb
+          response-body-limit: 100kb
+          request-body-minimal-inspect-size: 32kb
+          request-body-inspect-window: 4kb
+          response-body-minimal-inspect-size: 40kb
+          response-body-inspect-window: 16kb
+          response-body-decompress-layer-limit: 2
+          http-body-inline: auto
+          swf-decompression:
+            enabled: yes
+            type: both
+            compress-depth: 100kb
+            decompress-depth: 100kb
+          double-decode-path: no
+          double-decode-query: no
+    smtp:
+      enabled: yes
+    ssh:
+      enabled: yes
+    dns:
+      enabled: yes
+      detection-ports:
+        dp: 53
+    ftp:
+      enabled: yes
+    rdp:
+      enabled: yes
+    smb:
+      enabled: yes
+
+# =============================================================
+# Rule Files
+# =============================================================
+default-rule-path: /var/lib/suricata/rules
+
+rule-files:
+  - suricata.rules
+  - /etc/suricata/rules/local.rules
+  - /etc/suricata/rules/drop.rules
+
+# =============================================================
+# Threshold Configuration
+# =============================================================
+threshold-file: /etc/suricata/threshold.conf
+
+# =============================================================
+# Logging
+# =============================================================
+logging:
+  default-log-level: notice
+  outputs:
+    - console:
+        enabled: yes
+    - file:
+        enabled: yes
+        level: info
+        filename: /var/log/suricata/suricata.log
+    - syslog:
+        enabled: no
+        facility: local5
+        format: "[%i] <%d> -- "
