@@ -1,0 +1,8 @@
+local.rules
+ ├── ICMP Detection
+ ├── Port Scan Detection
+ ├── SSH Brute Force
+ ├── FTP Monitoring
+ ├── Web Attack Detection
+ ├── Malware Detection
+ └── DNS Monitoring
